@@ -850,18 +850,7 @@ const Sidebar = ({
                 v={v}
                 isCollapsed={isCollapsed}
               />
-                <Item
-                  title="Table Settings"
-                  to="/table-settings"
-                  selected={selected}
-                  setSelected={setSelected}
-                  setOpen={setOpen}
-                  userControl={userControl}
-                  isNav={isNav}
-                  setIsConfOpenDialog={setIsConfOpenDialog}
-                  v={v}
-                  isCollapsed={isCollapsed}
-              />
+               
               {/* </SubItem> */}
             </SubItem>
             <Item

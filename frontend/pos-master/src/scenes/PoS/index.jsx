@@ -180,6 +180,7 @@ const [multipleItems, setMultipleItems] = useState([]);
 const inputRef = useRef(null); // Create a ref for the InputBase
 const [selectedMealId, setSelectedMealId] = useState(null);
 const [temporaryQuantity, setTemporaryQuantity] = useState(1);
+
 const handleQuantityButtonClick = (mealId) => {
   setSelectedMealId(mealId);
   handleOpenNumericKeypad("Quantity");
@@ -1318,6 +1319,7 @@ useEffect(() => {
       // const compTimeRequest = await fetch(
       //   `${url}/pos/getCompTime/${companyName}`
       // );
+      
       if (compTime) {
         // Extract the time components from the compTime string
         const [hours, minutes, seconds] = compTime.split(":").map(Number);
@@ -1421,22 +1423,98 @@ useEffect(() => {
             setPayInUSDVISA(0);
             setPayInLBPVISA(0);   
             setSelectedAmounts([]);
-            if (allowPrintKT === "Y") {
-              const jsonString = JSON.stringify(responseData, null, 2);
-              const blob = new Blob([jsonString], { type: "application/json" });
-              FileSaver.saveAs(blob, "response-data.json");
-
-              // Increment the placeOrderCount
-              placeOrderCount++;
-
-              // Check if the placeOrderCount reaches 3
-              if (placeOrderCount === 3) {
-                // Reload the page after 3 placing orders
-                setTimeout(() => {
-                  window.location.reload();
-                }, 3000);
+           // Print according to kitchen types if allowed
+      if (allowPrintKT === "Y") {
+        
+    // Create an object to group meals by kitchen type
+    const mealsByKitchen = unsentMeals.reduce((acc, meal) => {
+      const kitchenTypes = { KT1: meal.KT1, KT2: meal.KT2, KT3: meal.KT3, KT4: meal.KT4 };
+      Object.entries(kitchenTypes).forEach(([ktKey, kitchen]) => {
+          if (kitchen) {
+              if (!acc[kitchen]) {
+                  acc[kitchen] = [];
               }
+              acc[kitchen].push({ 
+                  ItemNo: meal.ItemNo, 
+                  ItemName: meal.ItemName, 
+                  quantity: meal.quantity 
+              });
+          }
+      });
+      return acc;
+  }, {});
+
+  let printDelay = 0; // Initialize a delay counter
+
+  // Loop through each kitchen and print receipts
+  Object.entries(mealsByKitchen).forEach(([kitchen, meals], index) => {
+      const printableContent = `
+         <style>
+        .printable {
+            display: none; /* Hide by default */
+        }
+        @media print {
+            .printable {
+                display: block; /* Show when printing */
             }
+        }
+    </style>
+    <div class="printable" style="text-align: center; page-break-after: always;">
+              <h1>Receipt for ${kitchen}</h1>
+              <table style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                      <tr>
+                          <th style="border: 1px solid black; padding: 8px;">Item No</th>
+                          <th style="border: 1px solid black; padding: 8px;">Item Name</th>
+                          <th style="border: 1px solid black; padding: 8px;">Quantity</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${meals.map(meal => `
+                          <tr>
+                              <td style="border: 1px solid black; padding: 8px;">${meal.ItemNo}</td>
+                              <td style="border: 1px solid black; padding: 8px;">${meal.ItemName}</td>
+                              <td style="border: 1px solid black; padding: 8px;">${meal.quantity}</td>
+                          </tr>
+                      `).join('')}
+                  </tbody>
+              </table>
+          </div>
+      `;
+  
+      // Create a temporary element for the receipt content
+      const tempElement = document.createElement('div');
+      tempElement.innerHTML = printableContent;
+      document.body.appendChild(tempElement);
+  
+      // Increase the delay for each subsequent print job
+      printDelay += 1000; // Increase delay by 1000ms (1 second) for each kitchen
+  
+      // Print the receipt for the kitchen after the delay
+      setTimeout(() => {
+          printJS({
+              printable: tempElement,
+              type: 'html',
+              targetStyles: ['*'],
+              documentTitle: `Receipt for ${kitchen}`,
+              honorColor: true,
+              scanStyles: false,
+              header: null,
+              footer: null,
+              showModal: false,
+              onError: (error) => {
+                  console.error("Printing error:", error);
+              },
+              onPrintDialogClose: () => {
+                  console.log("Print dialog closed");
+                  // Remove the temporary element after printing
+                  document.body.removeChild(tempElement);
+              },
+              printerName: defaultPrinter,
+          });
+      }, printDelay); // Use the cumulative delay
+  });
+}
 
             // if (!selectedTableId) {
             //   handlePrint();
@@ -1562,93 +1640,65 @@ useEffect(() => {
   const getItemListTable = () => {
     const styles = {
       container: {
-        height: "100%",
         width: "100%",
-        padding: "16px",
-        backgroundColor: "#fff",
-        boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
-        borderRadius: "8px",
+        backgroundColor: "#ffffff", // Use pure white for background
+        boxShadow: "none", // Avoid shadows as they may not appear on thermal printers
+        borderRadius: "0px", // Keep edges simple for printing clarity
+        margin: "0 auto",
       },
       header: {
         display: "flex",
         justifyContent: "space-between",
-        borderBottom: "2px solid #E5E7EB",
-        paddingBottom: "12px",
-        marginBottom: "16px",
-        color: "#4CAF50", // Matching the green accent in the image
+        padding: "8px",
+        backgroundColor: "#000000", // Black for high contrast
+        color: "#ffffff", // White text for contrast against black
         fontWeight: "bold",
-        fontSize: "16px",
+        fontSize: "14px",
+        borderBottom: "1px solid #000000", // Ensure separator line is dark
       },
       row: {
         display: "flex",
         justifyContent: "space-between",
-        borderBottom: "1px solid #F1F1F1",
-        padding: "12px 0",
-        fontSize: "14px",
+        padding: "8px 6px",
+        borderBottom: "1px solid #000000", // Dark lines for visibility
+        fontSize: "12px",
+        color: "#000000", // Black text for contrast
       },
       cell: {
         flex: "1",
-        textAlign: "right",
-        color: "#333",
+        textAlign: "center",
+        maxWidth: "33%",
       },
       descriptionCell: {
         flex: "2",
         textAlign: "left",
-        color: "#333",
+        paddingLeft: "10px",
+        maxWidth: "34%",
       },
       modifierRow: {
         display: "flex",
         justifyContent: "space-between",
-        padding: "8px 0",
-        backgroundColor: "#F9FAFB",
-        borderRadius: "6px",
+        padding: "6px 6px",
+        backgroundColor: "#e0e0e0", // Light gray for slight contrast from main rows
+        fontSize: "12px",
+        color: "#000000",
       },
       modifierCell: {
         flex: "1",
-        textAlign: "right",
+        textAlign: "center",
       },
       descriptionModifierCell: {
         flex: "2",
-        textAlign: "left",
-        color: "#666",
+        paddingLeft: "10px",
       },
-
-        // Mobile styles
-    '@media (max-width: 1200px)': {
-      container: {
-        padding: "12px",
-        
+      print: {
+        '@media print': {
+          marginLeft: "0",
+        },
       },
-      header: {
-        flexDirection: "column", // Stack items vertically
-        alignItems: "flex-start",
-        fontSize: "14px",
-        paddingBottom: "8px",
-      },
-      row: {
-        flexDirection: "column", // Stack each row's items
-        alignItems: "flex-start",
-        padding: "8px 0",
-      },
-      cell: {
-        textAlign: "left", // Align all text to the left
-        fontSize: "12px",
-      },
-      descriptionCell: {
-        textAlign: "left",
-        fontSize: "12px",
-      },
-      modifierRow: {
-        flexDirection: "column",
-        alignItems: "flex-start",
-        padding: "6px 0",
-      },
-      modifierCell: {
-        textAlign: "left",
-        fontSize: "12px",
-      },
-    }
     };
+    
+  
     
 
     return (
@@ -2517,7 +2567,11 @@ useEffect(() => {
                   variant="contained"
                   color="secondary"
                   sx={{ borderRadius: "20px", width: "15%" }}
-                  onClick={handleP}
+                  // onClick={handleP}
+                  onClick={() => {
+                    handleP();
+                    focusInputField();
+                  }}
                 >
                  {t["Print"]}
                 </Button>
@@ -2525,7 +2579,11 @@ useEffect(() => {
                   variant="contained"
                   color="secondary"
                   sx={{ borderRadius: "20px", width: "15%" }}
-                  onClick={handleBack}
+                  // onClick={handleBack}
+                  onClick={() => {
+                    handleBack();
+                    focusInputField();
+                  }}
                   disabled={location.search.includes("selectedTableId")}
                 >
                   <ArrowBackIcon />
@@ -2534,7 +2592,11 @@ useEffect(() => {
                   variant="contained"
                   color="secondary"
                   sx={{ borderRadius: "20px", width: "15%" }}
-                  onClick={handleRecall}
+                  // onClick={handleRecall}
+                  onClick={() => {
+                    handleRecall();
+                    focusInputField();
+                  }}
                   disabled={location.search.includes("selectedTableId")}
                 >
                   {t["Recall"]}
@@ -2543,14 +2605,21 @@ useEffect(() => {
                   variant="contained"
                   color="secondary"
                   sx={{ borderRadius: "20px", width: "15%" }}
-                  onClick={handleNext}
+                  // onClick={handleNext}
+                  onClick={() => {
+                    handleNext();
+                    focusInputField();
+                  }}
                   disabled={location.search.includes("selectedTableId")}
                 >
                   <ArrowForwardIcon />
                 </Button>
                 <Button
                   selected={allowPrintInv}
-                  onClick={() => handleToggle("receipt")}
+                  onClick={() => {
+                    handleToggle("receipt")
+                    focusInputField();
+                  }}
                   aria-label="print receipt"
                   sx={{
                     fontWeight: allowPrintInv === "Y" ? "bold" : "normal",
@@ -2574,7 +2643,10 @@ useEffect(() => {
                 </Button>
                 <Button
                   selected={allowPrintKT}
-                  onClick={() => handleToggle("kt")}
+                  onClick={() => {
+                    handleToggle("kt")
+                    focusInputField();
+                  }}
                   aria-label="print kt"
                   sx={{
                     fontWeight: allowPrintKT === "Y" ? "bold" : "normal",
@@ -3103,39 +3175,33 @@ useEffect(() => {
           </Card>
         </Box>
       </Box>
-      <Box id="myPrintableContent" sx={{ display: "none" }}>
+      <Box id="myPrintableContent" sx={{ display: "none" ,fontFamily: "Arial, sans-serif", padding: "5px", backgroundColor: "#f9f9f9" , width:'100%'}}>
         <div
           style={{
-            textAlign: "center",
-            width: "100%",
-            fontFamily: "Arial, sans-serif",
+          textAlign: "center", marginBottom: "20px", color: "#333"
           }}
         >
           {/* Company Information */}
           <div style={{ marginBottom: "20px" }}>
-            <div style={{ fontWeight: "bold", fontSize: "20px" }}>
-              {companyName}
-            </div>
-            <div style={{ marginBottom: "5px" }}>Order {orderId}</div>
+          <h2 style={{ fontWeight: "bold", margin: "10px 0" }}>{companyName}</h2>
+          <h4 style={{ margin: "5px 0" }}>Order {orderId}</h4>
 
-            {compPhone && <div style={{ marginTop: "5px" }}>{compPhone}</div>}
-            <div style={{ marginTop: "5px" }}>
+            {compPhone && <div style={{ marginTop: "5px 0" }}>{compPhone}</div>}
+            <div style={{ marginTop: "5px 0" }}>
               {compStreet && compStreet}
               {compStreet && compCity && ", "}
               {compCity && compCity}
               {branchDes && <span> {branchDes}</span>}
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  marginBottom: "5px",
-                  flexWrap: "wrap",
+               display: "flex", justifyContent: "center", marginBottom: "10px", flexWrap: "wrap"
                 }}
               >
-                <div style={{ marginRight: "10px" }}>InvNo {invN}</div>
+                <div style={{ marginRight: "20px" }}>InvNo {invN}</div>
                 <div>
                   {recallDate} {recallTime}
                 </div>
+                <h4 style={{ margin: "5px 0" }}> {orderId}</h4>
               </div>
             </div>
           </div>
@@ -3144,15 +3210,11 @@ useEffect(() => {
         </div>
 
         {getItemListTable()}
-        <div>
-          <div style={{ fontWeight: "bold" }}>Payment Summary</div>
+        <div  style={{ marginTop: '30px', borderTop: "2px solid #e5e7eb", paddingTop: "20px" }}>
+        <h4 style={{ fontWeight: "bold", marginBottom: "10px" }}>Payment Summary</h4>
           <div>
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-              }}
+             style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f1f1f1" }}
             >
               <div>Gross Total:</div>
               <div>
@@ -3161,11 +3223,7 @@ useEffect(() => {
             </div>
             {srv !== 0 && (
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                }}
+              style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f1f1f1" }}
               >
                 <div>Service:</div>
                 <div>{srv}%</div>
@@ -3176,11 +3234,7 @@ useEffect(() => {
             )}
             {discValue !== 0 && (
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                }}
+              style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f1f1f1" }}
               >
                 <div>Discount:</div>
                 <div>{discValue}%</div>
@@ -3190,11 +3244,7 @@ useEffect(() => {
             )}
             {totalDiscount !== 0 && (discValue !== 0 || srv !== 0) && (
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                }}
+              style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f1f1f1" }}
               >
                 <div>Total:</div>
                 <div>
@@ -3204,11 +3254,7 @@ useEffect(() => {
             )}
             {totalTax !== 0 && (
               <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                }}
+              style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f1f1f1" }}
               >
                 <div>Tax:</div>
                 <div>{vat}%</div>
@@ -3219,11 +3265,7 @@ useEffect(() => {
               </div>
             )}
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-              }}
+              style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", padding: "10px 0", borderTop: "2px solid #4caf50" }}
             >
               <div>Total:</div>
               {/* <div>{finalTotal}</div> */}
@@ -3237,16 +3279,16 @@ useEffect(() => {
         </div>
 
         {selectedRow && Object.keys(selectedRow).length > 0 && (
-          <div>
-            <div style={{ fontWeight: "bold" }}>Client Address</div>
+          <div style={{ marginTop: "20px", borderTop: "2px solid #e5e7eb", paddingTop: "20px" }}>
+              <h4 style={{ fontWeight: "bold" }}>Client Address</h4>
             {selectedRow["AccName"] !== "" && (
-              <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", }}>
+              <div style={{ display: "flex",  padding: "5px 0" ,gap:"20px" }}>
                 <div>Name:</div>
                 <div>{selectedRow["AccName"]}</div>
               </div>
             )}
             {selectedRow["Tel"] !== "" && selectedRow["Tel"] !== null && (
-              <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", }}>
+              <div style={{ display: "flex",  padding: "5px 0" ,gap:"20px" }}>
                 <div>Tel:</div>
                 <div>{selectedRow["Tel"]}</div>
               </div>
@@ -3254,7 +3296,7 @@ useEffect(() => {
             {selectedRow["Address"] !== "" &&
               selectedRow["Address"] !== null && (
                 <div
-                  style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", }}
+                style={{ display: "flex",  padding: "5px 0" ,gap:"20px" }}
                 >
                   <div>Address:</div>
                   <div>{selectedRow["Address"]}</div>
@@ -3263,14 +3305,14 @@ useEffect(() => {
             {selectedRow["Building"] !== "" &&
               selectedRow["Building"] !== null && (
                 <div
-                  style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", }}
+                style={{ display: "flex",  padding: "5px 0"  ,gap:"20px"}}
                 >
                   <div>Building:</div>
                   <div>{selectedRow["Building"]}</div>
                 </div>
               )}
             {selectedRow["Street"] !== "" && selectedRow["Street"] !== null && (
-              <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", }}>
+              <div style={{ display: "flex",  padding: "5px 0"  ,gap:"20px"}}>
                 <div>Street:</div>
                 <div>{selectedRow["Street"]}</div>
               </div>
@@ -3286,7 +3328,7 @@ useEffect(() => {
           </div>
         )}
 
-        <Typography variant="h5" style={{ textAlign: "center" }}>
+        <Typography variant="h5" style={{ textAlign: "center", marginTop: "30px", color: "#4caf50" }}>
           Thank you{username && `, you were served by ${username}`}
         </Typography>
       </Box>

@@ -4353,4 +4353,4 @@ async def getAllCurrencies(company_name: str):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="192.168.1.119", port=8000, reload=False, log_level="debug", debug=True)
+    uvicorn.run("main:app", host="192.168.1.111", port=8000, reload=False, log_level="debug", debug=True)

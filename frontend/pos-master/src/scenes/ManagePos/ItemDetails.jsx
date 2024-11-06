@@ -20,6 +20,7 @@ import { setIn } from "formik";
 import { useLanguage } from "../LanguageContext.js";
 import translations from "../translations.js";
 import EditIcon from "@mui/icons-material/Edit"; 
+import ListIcon from "@mui/icons-material/List";
 
 const ItemDetails = ({
   itemDetails,
@@ -62,6 +63,26 @@ const ItemDetails = ({
     GroupNo: itemDetails.GroupNo,
     GroupName: itemDetails.GroupName,
   });
+  // Inside your ItemDetails component
+const [ktList, setKtList] = useState([]); // State for KT printers list
+const [ktListOpen, setKtListOpen] = useState(false); // State for dropdown visibility
+const [ktField, setKtField] = useState(null); // State to track the current KT field
+
+useEffect(() => {
+  const fetchKtList = async () => {
+    try {
+      const response = await fetch(`${url}/pos/kitchen/${companyName}`);
+      if (!response.ok) throw new Error("Error fetching KT printers list");
+      const data = await response.json();
+      setKtList(data); // Set the KT list in state
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  fetchKtList();
+}, [companyName]);
+
   const handleValueUpdate = (field, updatedValue) => {
     if (
       field === "Tax" ||
@@ -297,7 +318,7 @@ const ItemDetails = ({
             <Typography variant="h4">N</Typography>
           </div>
         </div>
-) : key === "UPrice" || key === "UPrice1" || key === "UPrice2" || key === "UPrice3" || key === "UPrice4" || key === "UPrice5" || key === "UPrice6" || key === "Disc" || key === "Tax" || key === "KT1" || key === "KT2" || key === "KT3" || key === "KT4" ? (
+) : key === "UPrice" || key === "UPrice1" || key === "UPrice2" || key === "UPrice3" || key === "UPrice4" || key === "UPrice5" || key === "UPrice6" || key === "Disc" || key === "Tax"  ? (
   <TextField
     value={value}
     onChange={(e) => handleValueUpdate(key, e.target.value)}
@@ -314,6 +335,59 @@ const ItemDetails = ({
       setActiveField(key);
     }}
   />
+) : key === "KT1" || key === "KT2" || key === "KT3" || key === "KT4" ? (
+    <div style={{ display: "flex", alignItems: "center" }}>
+      <TextField
+        value={value}
+        onChange={(e) => handleValueUpdate(key, e.target.value)}
+        fullWidth
+        size="small"
+        variant="outlined"
+        inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+        onDoubleClick={() => {
+          setInputValue("");
+          setTickKey(false);
+          setShowKeyboard(true);
+        }}
+        onFocus={() => {
+          setActiveField(key);
+        }}
+      />
+        <ListIcon
+        onClick={() => {
+          setKtField(key); // Set the current KT field
+          setKtListOpen(!ktListOpen); // Toggle KT list dropdown
+        }}
+        style={{ cursor: "pointer", marginLeft: "8px" }}
+      />
+      {ktListOpen && ktField === key && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: "100%",
+            backgroundColor: "white",
+            border: "1px solid #ddd",
+            boxShadow: "0px 4px 8px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+            width: "200px",
+            maxHeight: "150px",
+            overflowY: "auto",
+          }}
+        >
+          {ktList.map((kt) => (
+            <MenuItem
+              key={kt.KT}
+              onClick={() => {
+                handleValueUpdate(ktField, kt.KT);
+                setKtListOpen(false); // Close dropdown
+              }}
+            >
+             Kitchen- {kt.KT}
+            </MenuItem>
+          ))}
+        </Box>
+      )}
+    </div>
 ) : key === "ItemNo" ? (
   <div style={{ display: "flex", alignItems: "center" }}>
               <TextField

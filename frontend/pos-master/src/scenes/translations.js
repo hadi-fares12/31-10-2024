@@ -375,7 +375,7 @@ const translations = {
     Recall:"إستدعاء",
     Messagecannotupdate:"لا يمكنك تحديث هذا عند طباعته",
     WelcomeScreen:`مرحبًا, ${username}!`,
-    ShowOnbarc:'تفعيل الباركود'
+    ShowOnbarc:'تفعيل الباركود',
   },
 };
 
